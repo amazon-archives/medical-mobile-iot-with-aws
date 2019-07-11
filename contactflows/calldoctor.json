@@ -1,0 +1,144 @@
+{
+  "modules": [
+    {
+      "id": "2cae2595-2f0b-4b3a-b7ed-f6f717734a00",
+      "type": "PlayPrompt",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "b4169dac-a3f0-47c6-a183-e990e5da0b98"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Text",
+          "value": "Hello doctor $.Attributes.doctorName . We have detected an alarm for your patient $.Attributes.patientName",
+          "namespace": null
+        },
+        {
+          "name": "TextToSpeechType",
+          "value": "text"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 197,
+          "y": 68
+        },
+        "useDynamic": false
+      }
+    },
+    {
+      "id": "b4934800-0d25-48d4-bebb-10eb7a993af8",
+      "type": "Disconnect",
+      "branches": [],
+      "parameters": [],
+      "metadata": {
+        "position": {
+          "x": 718,
+          "y": 530
+        }
+      }
+    },
+    {
+      "id": "b4169dac-a3f0-47c6-a183-e990e5da0b98",
+      "type": "GetUserInput",
+      "branches": [
+        {
+          "condition": "Evaluate",
+          "conditionType": "Equals",
+          "conditionValue": "0",
+          "transition": "4733e818-4805-463a-89cf-07820d1c930c"
+        },
+        {
+          "condition": "Timeout",
+          "transition": "b4934800-0d25-48d4-bebb-10eb7a993af8"
+        },
+        {
+          "condition": "NoMatch",
+          "transition": "4733e818-4805-463a-89cf-07820d1c930c"
+        },
+        {
+          "condition": "Error",
+          "transition": "b4934800-0d25-48d4-bebb-10eb7a993af8"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Text",
+          "value": "Please press 0 to confirm that you are taking the patient in charge",
+          "namespace": null
+        },
+        {
+          "name": "TextToSpeechType",
+          "value": "text"
+        },
+        {
+          "name": "Timeout",
+          "value": "5"
+        },
+        {
+          "name": "MaxDigits",
+          "value": "1"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 475,
+          "y": 90
+        },
+        "conditionMetadata": [
+          {
+            "id": "9aee8070-90a8-4b88-bbd4-559445313220",
+            "value": "0"
+          }
+        ],
+        "useDynamic": false
+      },
+      "target": "Digits"
+    },
+    {
+      "id": "4733e818-4805-463a-89cf-07820d1c930c",
+      "type": "PlayPrompt",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "b4934800-0d25-48d4-bebb-10eb7a993af8"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Text",
+          "value": "Thank you very much doctor $.Attributes.doctorName . Have a nice day.",
+          "namespace": null
+        },
+        {
+          "name": "TextToSpeechType",
+          "value": "text"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 829,
+          "y": 181
+        },
+        "useDynamic": false
+      }
+    }
+  ],
+  "version": "1",
+  "type": "contactFlow",
+  "start": "2cae2595-2f0b-4b3a-b7ed-f6f717734a00",
+  "metadata": {
+    "entryPointPosition": {
+      "x": 20,
+      "y": 20
+    },
+    "snapToGrid": false,
+    "name": "GuardianAngelCallDoctor",
+    "description": null,
+    "type": "contactFlow",
+    "status": "published",
+    "hash": "14945f6dd05cf9c5bf4e0d70508fa522697ac83167fcb4eda7a4733873f04b52"
+  }
+}

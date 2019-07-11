@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "ConnectInstance",
+    "ParameterValue": ""
+  }, 
+  {
+    "ParameterKey": "ContactFlowId",
+    "ParameterValue": ""
+  }, 
+  {
+    "ParameterKey": "SourcePhoneNumber",
+    "ParameterValue": ""
+  }
+]

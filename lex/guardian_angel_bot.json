@@ -1,0 +1,22 @@
+{
+    "intents": [
+        {
+            "intentVersion": "$LATEST",
+            "intentName": "GuardianAngel"
+        }
+    ],
+    "name": "GuardianAngel",
+    "locale": "en-US",
+    "clarificationPrompt": {
+        "maxAttempts": 5,
+        "messages": [
+            {
+                "content": "I didn't understand you, what would you like to do?",
+                "contentType": "PlainText"
+            }
+        ]
+    },
+    "voiceId": "Salli",
+    "childDirected": false,
+    "idleSessionTTLInSeconds": 600
+}

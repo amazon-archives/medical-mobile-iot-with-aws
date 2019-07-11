@@ -1,0 +1,10 @@
+{
+    "name": "Alert",
+    "sampleUtterances": [
+        "zero",
+        "Yes"
+    ],
+    "fulfillmentActivity": {
+	"type": "ReturnIntent"
+    }
+}

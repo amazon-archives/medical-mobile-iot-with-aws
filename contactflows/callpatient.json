@@ -1,0 +1,188 @@
+{
+  "modules": [
+    {
+      "id": "35a4eaa6-f999-4b12-b965-85673ab03419",
+      "type": "Disconnect",
+      "branches": [],
+      "parameters": [],
+      "metadata": {
+        "position": {
+          "x": 776,
+          "y": 499
+        }
+      }
+    },
+    {
+      "id": "4349c3d3-0d8d-4e4d-b98d-6d1b87371a7c",
+      "type": "PlayPrompt",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "35a4eaa6-f999-4b12-b965-85673ab03419"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Text",
+          "value": "Thank you",
+          "namespace": null
+        },
+        {
+          "name": "TextToSpeechType",
+          "value": "text"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 741,
+          "y": 101
+        },
+        "useDynamic": false
+      }
+    },
+    {
+      "id": "9c00dc97-1f44-42a5-8328-19fe214fa65b",
+      "type": "InvokeExternalResource",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "35a4eaa6-f999-4b12-b965-85673ab03419"
+        },
+        {
+          "condition": "Error",
+          "transition": "35a4eaa6-f999-4b12-b965-85673ab03419"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "FunctionArn",
+          "value": "ADD CALL DOCTOR ARN HERE"
+        },
+        {
+          "name": "TimeLimit",
+          "value": "3"
+        },
+        {
+          "name": "Parameter",
+          "key": "doctorName",
+          "value": "doctorName",
+          "namespace": "User Defined"
+        },
+        {
+          "name": "Parameter",
+          "key": "patientName",
+          "value": "patientName",
+          "namespace": "User Defined"
+        },
+        {
+          "name": "Parameter",
+          "key": "doctorPhoneNumber",
+          "value": "doctorPhoneNumber",
+          "namespace": "User Defined"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 1112,
+          "y": 302
+        },
+        "dynamicMetadata": {
+          "doctorName": true,
+          "patientName": true,
+          "doctorPhoneNumber": true
+        }
+      },
+      "target": "Lambda"
+    },
+    {
+      "id": "f2be4c0a-2a4e-4584-8a81-6a18024500d8",
+      "type": "GetUserInput",
+      "branches": [
+        {
+          "condition": "NoMatch",
+          "transition": "4349c3d3-0d8d-4e4d-b98d-6d1b87371a7c"
+        },
+        {
+          "condition": "Error",
+          "transition": "69983103-1d2a-49e0-aef6-c5c7e041967b"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Text",
+          "value": "Hello $.Attributes.patientName We have received an alert. Please confirm you are feeling fine by pressing zero or saying \"yes\"",
+          "namespace": null
+        },
+        {
+          "name": "TextToSpeechType",
+          "value": "text"
+        },
+        {
+          "name": "BotName",
+          "value": "GuardianAngel"
+        },
+        {
+          "name": "BotAlias",
+          "value": "$LATEST"
+        },
+        {
+          "name": "BotRegion",
+          "value": "us-east-1"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 377,
+          "y": 20
+        },
+        "conditionMetadata": [],
+        "useDynamic": false,
+        "dynamicMetadata": {}
+      },
+      "target": "Lex"
+    },
+    {
+      "id": "69983103-1d2a-49e0-aef6-c5c7e041967b",
+      "type": "PlayPrompt",
+      "branches": [
+        {
+          "condition": "Success",
+          "transition": "9c00dc97-1f44-42a5-8328-19fe214fa65b"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "Text",
+          "value": "Your doctor will be notified now.",
+          "namespace": null
+        },
+        {
+          "name": "TextToSpeechType",
+          "value": "text"
+        }
+      ],
+      "metadata": {
+        "position": {
+          "x": 757,
+          "y": 257
+        },
+        "useDynamic": false
+      }
+    }
+  ],
+  "version": "1",
+  "type": "contactFlow",
+  "start": "f2be4c0a-2a4e-4584-8a81-6a18024500d8",
+  "metadata": {
+    "entryPointPosition": {
+      "x": 20,
+      "y": 20
+    },
+    "snapToGrid": false,
+    "name": "GuardianAngelCallPatient",
+    "description": null,
+    "type": "contactFlow",
+    "status": "published",
+    "hash": "addf93000e96bfab1ed92548a302cdef40296e90df56fa7f8089a3a17a91dbb7"
+  }
+}

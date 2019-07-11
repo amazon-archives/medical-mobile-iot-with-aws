@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters: 
+  ContactFlowId:
+    Type: String
+  SourcePhoneNumber: 
+    Type: String
+  ConnectInstance: 
+    Type: String
+Resources: 
+  CallDoctorLambdaTrigger: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      Handler: "index.handler"
+      Role: !GetAtt CallDoctorLambdaTriggerRole.Arn
+      Code:
+        ZipFile: >
+          const AWS = require('aws-sdk');
+          AWS.config.update({ region: 'us-east-1' });
+          exports.handler = (event, context, callback) => {
+              let connect = new AWS.Connect();
+              const doctorName = event['Details']['Parameters']['doctorName'];
+              const patientName = event['Details']['Parameters']['patientName'];
+              const doctorPhoneNumber = event['Details']['Parameters']['doctorPhoneNumber'];
+              let params = {
+                  "InstanceId" : process.env.CONNECTINSTANCE,
+                  "ContactFlowId" : process.env.CONTACTFLOW,
+                  "SourcePhoneNumber" : process.env.SOURCEPHONE,
+                  "DestinationPhoneNumber" : doctorPhoneNumber,
+                  "Attributes" : {
+                      'doctorName' : doctorName,
+                      'patientName' : patientName
+                  }
+              }
+              connect.startOutboundVoiceContact(
+                  params, function (error, response){
+                      if(error) {
+                          console.log(error)
+                          callback("Error", null);
+                      } else
+                      {
+                          console.log('Initiated an outbound call with Contact Id ' + JSON.stringify(response.ContactId));
+                          callback(null, 'Success');
+                      }
+                  }
+                  );
+          };
+      Runtime: "nodejs8.10"
+      Timeout: 25
+      Environment:
+        Variables:
+          SOURCEPHONE: !Ref SourcePhoneNumber
+          CONTACTFLOW: !Ref ContactFlowId
+          CONNECTINSTANCE: !Ref ConnectInstance
+  CallDoctorLambdaTriggerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CallDoctorLambdaTrigger.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: connect.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Sub
+        - arn:aws:connect:${AWS::Region}:${AWS::AccountId}:instance/${ConnectInstance}
+        - { ConnectInstance: !Ref ConnectInstance }
+  CallDoctorLambdaTriggerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies: 
+        - 
+          PolicyName: "callconnect"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "logs:*"
+                Resource: "*"
+  CallDoctorLambdaTriggerLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: 
+        Fn::Join: ["/", ["/aws/lambda", {"Ref": "CallDoctorLambdaTrigger"}]]
+      RetentionInDays: 1
+Outputs:
+  CallDoctorLambdaArn:
+    Description: Arn for Call Doctor Lambda
+    Value: !GetAtt CallDoctorLambdaTrigger.Arn

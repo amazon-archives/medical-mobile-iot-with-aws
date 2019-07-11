@@ -1,0 +1,560 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters: 
+  ContactFlowId: 
+    Type: String
+  SourcePhoneNumber: 
+    Type: String
+  ConnectInstance: 
+    Type: String
+Resources: 
+  SugarMonitor:
+    Type: AWS::IoT::Thing
+  SugarMonitorTopicRule: 
+    Type: AWS::IoT::TopicRule
+    Properties: 
+      TopicRulePayload: 
+        RuleDisabled: false
+        Sql: >-
+          SELECT * FROM 'slider'
+        Actions: 
+          - 
+            Firehose:
+              RoleArn: !GetAtt SugarMonitorTopicRuleRole.Arn
+              DeliveryStreamName: !Ref SugarMonitorFirehose
+  SugarMonitorTopicRuleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: iot.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies: 
+        - 
+          PolicyName: "putrecord"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action: "firehose:PutRecord"
+                Resource: !GetAtt SugarMonitorFirehose.Arn
+  SugarMonitorFirehose:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties: 
+      S3DestinationConfiguration: 
+        BufferingHints: 
+          IntervalInSeconds: 60
+          SizeInMBs: 1
+        CompressionFormat: UNCOMPRESSED
+        RoleARN: !GetAtt SugarMonitorFirehoseRole.Arn
+        BucketARN: !GetAtt SugarMonitorS3.Arn 
+  SugarMonitorFirehoseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: firehose.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies: 
+        - 
+          PolicyName: "writetobucket"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "s3:AbortMultipartUpload"
+                  - "s3:GetBucketLocation"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                  - "s3:ListBucketMultipartUploads"
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub '${SugarMonitorS3.Arn}/*'
+                  - !GetAtt SugarMonitorS3.Arn
+  SugarMonitorS3:
+    Type: AWS::S3::Bucket
+  SugarMonitorKinesisAnalytics:
+    Type: AWS::KinesisAnalytics::Application
+    Properties:
+      ApplicationCode: !Sub |
+        -- ** Anomaly detection **
+        -- Compute an anomaly score for each record in the source stream using Random Cut Forest
+        -- Creates a temporary stream and defines a schema
+        CREATE OR REPLACE STREAM "MONITOR_STREAM" (
+           "PatientID"        varchar(16),
+           "DeviceID"        INTEGER,
+           "Type"        varchar(16),
+           "COL_Value"        DOUBLE,
+           "ANOMALY_SCORE"  DOUBLE);
+        CREATE OR REPLACE STREAM "TEMP_STREAM" (
+           "PatientID"        varchar(16),
+           "DeviceID"        INTEGER,
+           "Type"        varchar(16),
+           "COL_Value"        DOUBLE,
+           "ANOMALY_SCORE"  DOUBLE);
+        -- Creates an output stream and defines a schema
+        CREATE OR REPLACE STREAM "DESTINATION_SQL_STREAM" (
+           "PatientID"        varchar(16),
+           "DeviceID"        INTEGER,
+           "Type"        varchar(16),
+           "COL_Value"        DOUBLE,
+           "ANOMALY_SCORE"  DOUBLE);
+        -- Creates an trigger count stream and defines a schema   
+        CREATE OR REPLACE STREAM "TRIGGER_COUNT_STREAM" (
+           "PatientID"        varchar(16),
+           "DeviceID"        INTEGER,
+           "Type"        varchar(16),
+           "COL_Value"        DOUBLE,
+           "ANOMALY_SCORE"  DOUBLE,
+           "trigger_count" INTEGER);
+         
+        CREATE OR REPLACE PUMP "MONITOR_PUMP" AS INSERT INTO "MONITOR_STREAM"
+        SELECT STREAM "PatientID", "DeviceID", "Type", "COL_Value", "ANOMALY_SCORE" FROM
+          TABLE(RANDOM_CUT_FOREST(
+            CURSOR(SELECT STREAM "PatientID", "DeviceID", "Type", "COL_Value" FROM "SugarMonitor_001"),    
+                           5,
+                           50,
+                           100,
+                           10
+          )
+        );
+        -- Compute an anomaly score for each record in the source stream
+        -- using Random Cut Forest
+        CREATE OR REPLACE PUMP "STREAM_PUMP" AS INSERT INTO "TEMP_STREAM"
+        SELECT STREAM "PatientID", "DeviceID", "Type", "COL_Value", "ANOMALY_SCORE" FROM "MONITOR_STREAM" where "ANOMALY_SCORE" > 1;
+        CREATE OR REPLACE PUMP "trigger_count_pump" AS INSERT INTO "TRIGGER_COUNT_STREAM"
+        SELECT STREAM "PatientID", "DeviceID", "Type", "COL_Value", "ANOMALY_SCORE", "trigger_count"
+        FROM (
+            SELECT STREAM "PatientID", "DeviceID", "Type", "COL_Value", "ANOMALY_SCORE", COUNT(*) OVER W1 as "trigger_count"
+            FROM "TEMP_STREAM"
+            --window to perform aggregations over last 10 minutes to keep track of triggers
+            WINDOW W1 AS (PARTITION BY "PatientID" RANGE INTERVAL '10' MINUTE PRECEDING)
+        )
+        WHERE "trigger_count" >= 1;
+        -- Sort records by descending anomaly score, insert into output stream
+         CREATE OR REPLACE PUMP "OUTPUT_PUMP" AS INSERT INTO "DESTINATION_SQL_STREAM"
+         SELECT STREAM "PatientID", "DeviceID", "Type", "COL_Value", "ANOMALY_SCORE" FROM "TRIGGER_COUNT_STREAM" where "trigger_count" >= 8
+         ORDER BY FLOOR("TRIGGER_COUNT_STREAM".ROWTIME TO SECOND), ANOMALY_SCORE DESC;
+        -- CREATE OR REPLACE PUMP "OUTPUT_PUMP" AS INSERT INTO "DESTINATION_SQL_STREAM"
+        -- SELECT STREAM "PatientID", "DeviceID", "Type", "COL_Value", "ANOMALY_SCORE" FROM "MONITOR_STREAM" where "COL_Value" <= 3.5 OR "COL_Value" >= 7
+        -- ORDER BY FLOOR("MONITOR_STREAM".ROWTIME TO SECOND), ANOMALY_SCORE DESC;
+      Inputs:
+      - NamePrefix: "SugarMonitor"
+        InputSchema:
+          RecordColumns:
+           - Name: "PatientID"
+             SqlType: "VARCHAR(16)"
+             Mapping: "$.PatientId"
+           - Name: "DeviceID"
+             SqlType: "INTEGER"
+             Mapping: "$.DeviceId"
+           - Name: "COL_TimeStamp"
+             SqlType: "TIMESTAMP"
+             Mapping: "$.Timestamp"
+           - Name: "COL_Value"
+             SqlType: "DOUBLE"
+             Mapping: "$.Value"
+           - Name: "Type"
+             SqlType: "VARCHAR(16)"
+             Mapping: "$.Type"
+           - Name: "Unit"
+             SqlType: "VARCHAR(8)"
+             Mapping: "$.Unit"
+           - Name: "GeoData"
+             SqlType: "VARCHAR(32)"
+             Mapping: "$.GeoData"
+          RecordFormat:
+            RecordFormatType: "JSON"
+            MappingParameters:
+              JSONMappingParameters:
+                RecordRowPath: "$"
+        KinesisFirehoseInput:
+          ResourceARN: !GetAtt SugarMonitorFirehose.Arn
+          RoleARN: !GetAtt SugarMonitorAnalyticsRole.Arn
+  SugarMonitorAnalyticsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: kinesisanalytics.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies: 
+        - 
+          PolicyName: "readfirehose"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "firehose:DescribeStream"
+                  - "firehose:GetShardIterator"
+                  - "firehose:GetRecords"
+                  - "firehose:ListShards"
+                Resource: !GetAtt SugarMonitorFirehose.Arn
+              - 
+                Effect: "Allow"
+                Action:
+                  - "lambda:*"
+                Resource: !GetAtt SugarMonitorLambdaTrigger.Arn
+  SugarMonitorAnalyticsOutput:
+    Type: AWS::KinesisAnalytics::ApplicationOutput
+    Properties:
+      ApplicationName: !Ref SugarMonitorKinesisAnalytics
+      Output:
+        DestinationSchema:
+          RecordFormatType: "JSON"
+        LambdaOutput:
+          ResourceARN: !GetAtt SugarMonitorLambdaTrigger.Arn
+          RoleARN: !GetAtt SugarMonitorAnalyticsRole.Arn
+        Name: DESTINATION_SQL_STREAM
+
+  SugarMonitorLambdaTrigger: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      Handler: "index.handler"
+      Role: !GetAtt SugarMonitorLambdaTriggerRole.Arn
+      Code:
+        ZipFile: >
+          import json
+          
+          import os
+
+          import boto3
+
+          import botocore
+
+          import base64
+
+          import datetime
+
+          def handler(event, context):
+              lockminutes = 50
+              arn = os.environ['BUCKET']
+              sourcephone = os.environ['SOURCEPHONE']
+              contactflowid = os.environ['CONTACTFLOWID']
+              connectinstance = os.environ['CONNECTINSTANCE']
+              elements = arn.split(':')
+              bucket = elements[5]
+              s3 = boto3.resource('s3')
+              # get PatientID from event triggered 
+              patRec = json.dumps(event)
+              b64 = json.loads(patRec)['records'][0]['data']
+              decoded = base64.b64decode(b64)
+              patientData = json.loads(decoded)
+              pID = patientData['PatientID']
+              print(pID)
+              # get list of Patients from S3 json file
+              key = 'private/' + pID + '/config.json'
+              response = s3.Object(bucket, key).get()
+              patRecJson = response['Body'].read().decode('utf-8')
+              json_content = json.loads(patRecJson)
+              doctorN = json_content['Doctor#']
+              patientN = json_content['Patient#']
+              Doctor = json_content['Doctor']
+              Name = json_content['Name']
+              # check if timeout
+              try:
+                timeout = s3.Object(bucket, pID+'.lock').get()
+                lmodified = timeout['LastModified'] #Here was a typo
+                print(lmodified)
+                flag=0
+                #Works now. Just test and fix if required
+                if (lmodified + datetime.timedelta(minutes=lockminutes)) > datetime.datetime.now(datetime.timezone.utc):
+                  print("STOP")
+                else:
+                  print(datetime.datetime.now(datetime.timezone.utc))
+                  print(datetime.timedelta(minutes=3))
+                  print(lmodified)
+                  print("GO")
+                  flag=1
+                  newFile = s3.Object(bucket, pID+'.lock')
+                  newFile.put(Body="null")
+              except botocore.exceptions.ClientError as e:
+                print("nofile" + Name)
+                newFile = s3.Object(bucket, pID+'.lock')
+                newFile.put(Body="null")
+                print("created")
+                flag=1
+              if(flag==1):
+                connect = boto3.client('connect')
+                response = connect.start_outbound_voice_contact(
+                    DestinationPhoneNumber=patientN,
+                    ContactFlowId=contactflowid,
+                    InstanceId=connectinstance,
+                    SourcePhoneNumber=sourcephone,
+                    Attributes =  {
+                      "doctorName": Doctor,
+                      "patientName": Name,
+                      "doctorPhoneNumber": doctorN
+                    }
+                )
+              output = []
+              for record in event['records']:
+                output.append({'recordId': record['recordId'], 'result': 'Ok'})
+              return { 'records': output }
+      Runtime: "python3.7"
+      Timeout: 25
+      Environment:
+        Variables:
+          BUCKET: !GetAtt SugarMonitorPatientsS3.Arn 
+          SOURCEPHONE: !Ref SourcePhoneNumber
+          CONTACTFLOWID: !Ref ContactFlowId
+          CONNECTINSTANCE: !Ref ConnectInstance
+  SugarMonitorLambdaTriggerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies: 
+        - 
+          PolicyName: "callconnect"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "connect:*"
+                  - "logs:*"
+                Resource: "*"
+              - 
+                Effect: "Allow"
+                Action:
+                  - "s3:AbortMultipartUpload"
+                  - "s3:GetBucketLocation"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                  - "s3:ListBucketMultipartUploads"
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub '${SugarMonitorPatientsS3.Arn}/*'
+                  - !GetAtt SugarMonitorPatientsS3.Arn
+  SugarMonitorLambdaTriggerLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: 
+        Fn::Join: ["/", ["/aws/lambda", {"Ref": "SugarMonitorLambdaTrigger"}]]
+      RetentionInDays: 1
+  SugarMonitorPatientsS3:
+    Type: AWS::S3::Bucket
+    Properties:
+      CorsConfiguration:
+        CorsRules:
+        - AllowedOrigins: ['*']
+          AllowedMethods: [HEAD, GET, PUT, POST, DELETE]
+          MaxAge: '3000'
+          AllowedHeaders: ['*']
+          ExposedHeaders: [ETag, x-amz-server-side-encryption, x-amz-request-id, x-amz-id-2]
+          Id: amplifyAccess
+  SugarMonitorIdPool:
+    Type: "AWS::Cognito::IdentityPool"
+    Properties:
+      AllowUnauthenticatedIdentities: true
+  SugarMonitorPoolRoleAttach:
+    Type: "AWS::Cognito::IdentityPoolRoleAttachment"
+    Properties:
+      IdentityPoolId: !Ref SugarMonitorIdPool
+      Roles:
+        unauthenticated: !GetAtt SugarMonitorIdPoolRole.Arn
+        authenticated: !GetAtt SugarMonitorIdPoolRole.Arn
+  SugarMonitorIdPoolRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Federated: cognito-identity.amazonaws.com
+          Action:
+          - sts:AssumeRoleWithWebIdentity
+          Condition:
+            StringEquals:
+              cognito-identity.amazonaws.com:aud: !Ref SugarMonitorIdPool
+      Path: "/"
+      Policies: 
+        - 
+          PolicyName: "cognito"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - "mobileanalytics:PutEvents"
+                  - "cognito-sync:*"
+                  - "cognito-identity:*"
+                  - "iot:*"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub '${SugarMonitorPatientsS3.Arn}/private/${!cognito-identity.amazonaws.com:sub}/*'
+                  - !Sub '${SugarMonitorPatientsS3.Arn}/private/${!cognito-identity.amazonaws.com:sub}'
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub '${SugarMonitorPatientsS3.Arn}'
+  IotEndpointProviderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies: 
+        - 
+          PolicyName: "callconnect"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action:
+                  - iot:DescribeEndpoint
+                Resource: "*"
+  IotEndpointProvider:
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      Timeout: 3
+      Runtime: "python3.7"
+      Handler: "index.handler"
+      Role: !GetAtt IotEndpointProviderRole.Arn
+      Code:
+        ZipFile: >
+          import boto3
+
+          import json
+          
+          from botocore.vendored import requests
+          
+          def handler(event, context):
+            client = boto3.client('iot')
+            val = client.describe_endpoint()
+            response_body = {
+                "Status": "SUCCESS",
+                'Reason': 'See the details in CloudWatch Log Stream',
+                'PhysicalResourceId': 'Custom Lambda Function',
+                'StackId': event['StackId'],
+                'RequestId': event['RequestId'],
+                'LogicalResourceId': event['LogicalResourceId'],
+                "Data": { "IotEndpointAddress": val['endpointAddress'] }
+            }
+            requests.put(event['ResponseURL'], data=json.dumps(response_body))
+  IotEndpoint:
+    Type: 'Custom::IotEndpoint'
+    Properties:
+      ServiceToken: !GetAtt IotEndpointProvider.Arn
+  SugarMonitorGlueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "glue.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        -
+          PolicyName: "root"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action: "*"
+                Resource:
+                  - !Sub '${SugarMonitorS3.Arn}/*'
+                  - !GetAtt SugarMonitorS3.Arn
+              - 
+                Effect: "Allow"
+                Action:
+                  - "logs:*"
+                Resource: "*"
+              - 
+                Effect: "Allow"
+                Action:
+                  - "glue:*"
+                Resource: "*"
+  SugarMonitorGlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: sugarmonitorgluedb
+        Description: "Glue for patient data"
+  SugarMonitorGlueCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Role: !GetAtt SugarMonitorGlueRole.Arn
+      Schedule:
+        ScheduleExpression: 'cron(0/15 * ? * * *)'
+      DatabaseName: !Ref SugarMonitorGlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${SugarMonitorS3}'
+      SchemaChangePolicy:
+        UpdateBehavior: "UPDATE_IN_DATABASE"
+        DeleteBehavior: "LOG"
+      Configuration: "{\"Version\":1.0,\"CrawlerOutput\":{\"Partitions\":{\"AddOrUpdateBehavior\":\"InheritFromTable\"},\"Tables\":{\"AddOrUpdateBehavior\":\"MergeNewColumns\"}}}"
+  SugarMonitorGlueCrawlerLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: 
+        Fn::Join: ["/", ["/aws-glue/crawlers", {"Ref": "SugarMonitorGlueCrawler"}]]
+      RetentionInDays: 1
+  AthenaNamedQuery:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Database: !Ref SugarMonitorGlueDatabase
+      QueryString: !Sub
+        - 'select patientid, value, timestamp from ${S3Bucket} order by timestamp asc;'
+        - S3Bucket: !Join
+          - '_'
+          - !Split
+            - '-'
+            - !Ref SugarMonitorS3
+Outputs:
+  IdPool:
+    Description: Cognito IdPool
+    Value: !Ref SugarMonitorIdPool 
+  PatientBucket:
+    Description: PatientBucket
+    Value: !Ref SugarMonitorPatientsS3 
+  IotEndpointAddress:
+    Value: !GetAtt IotEndpoint.IotEndpointAddress
+  AthenaNamedQuery:
+    Value: !Ref AthenaNamedQuery
