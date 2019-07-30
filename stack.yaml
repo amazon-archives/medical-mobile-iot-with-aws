@@ -263,10 +263,10 @@ Resources:
               response = s3.Object(bucket, key).get()
               patRecJson = response['Body'].read().decode('utf-8')
               json_content = json.loads(patRecJson)
-              doctorN = json_content['Doctor#']
-              patientN = json_content['Patient#']
-              Doctor = json_content['Doctor']
-              Name = json_content['Name']
+              doctorN = json_content['drphone']
+              patientN = json_content['name']
+              Doctor = json_content['drname']
+              Name = json_content['name']
               # check if timeout
               try:
                 timeout = s3.Object(bucket, pID+'.lock').get()
