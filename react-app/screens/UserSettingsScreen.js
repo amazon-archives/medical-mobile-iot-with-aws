@@ -25,6 +25,7 @@ export default class HomeScreen extends React.Component {
     };
     this.getUser = this.getUser.bind(this);
     this.saveUser = this.saveUser.bind(this);
+    this.handleChange = this.handleChange.bind(this);
   }
   static navigationOptions = {
 	  title: 'User Settings',
@@ -37,14 +38,14 @@ export default class HomeScreen extends React.Component {
   async getUser(){
     await Helper.getUser().then(function(result){
 	this.setState({user: result})
-    	console.log(this.state.user)
 	this.setState({isLoading: false});
     }.bind(this));
   }
 
   handleChange(key, value) {
     tempuser = this.state.user;
-    tempuser[$key] = value;
+    tempuser[key] = value;
+    console.log(tempuser)
     this.setState({user: tempuser});
   }
   saveUser() {
@@ -66,28 +67,28 @@ export default class HomeScreen extends React.Component {
                   selectTextOnFocus={true}
                   style={styles.formInput}
                   value={this.state.user.name}
-                  onChangeText={value => this.handleChange({name: value})}
+                  onChangeText={value => this.handleChange("name", value)}
                 />
                 <Text style={styles.formLabel}>Phone Number</Text>
                 <TextInput
                   selectTextOnFocus={true}
                   style={styles.formInput}
                   value={this.state.user.phone}
-                  onChangeText={value => this.handleChange({phone: value})}
+                  onChangeText={value => this.handleChange("phone", value)}
                 />
                 <Text style={styles.formLabel}>Doctor Name</Text>
                 <TextInput
                   selectTextOnFocus={true}
                   style={styles.formInput}
                   value={this.state.user.drname}
-                  onChangeText={value => this.handleChange({drname: value})}
+                  onChangeText={value => this.handleChange("drname", value)}
                 />
                 <Text style={styles.formLabel}>Dr Phone</Text>
                 <TextInput
                   selectTextOnFocus={true}
                   style={styles.formInput}
                   value={this.state.user.drphone}
-                  onChangeText={value => this.handleChange({drphone: value})}
+                  onChangeText={value => this.handleChange("drphone", value)}
                 />
                 <View style={styles.controlButton}>
                   <Button title="Save" onPress={() => this.saveUser()} />
