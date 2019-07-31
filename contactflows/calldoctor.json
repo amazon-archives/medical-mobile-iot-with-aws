@@ -135,7 +135,7 @@
       "y": 20
     },
     "snapToGrid": false,
-    "name": "GuardianAngelCallDoctor",
+    "name": "MedicalMobileIoTWithAWSCallDoctor",
     "description": null,
     "type": "contactFlow",
     "status": "published",

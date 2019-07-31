@@ -137,14 +137,14 @@ Now we can deploy the lambda with the AWS CLI using cloudformation. (Update regi
 
 ```bash
 aws cloudformation create-stack --template-body file://calldoctor.yaml \
-	--capabilities CAPABILITY_IAM --stack-name guardianangel-doctor \
+	--capabilities CAPABILITY_IAM --stack-name medical-mobile-iot-with-aws-doctor \
 	--region us-east-1 --parameters file://calldoctor.json
 ```
 
 When the stack is done deploying it provides an arn for the lambda it creates. We need to retrieve that arn
 
 ```bash
-aws cloudformation describe-stack --stack-name guardianangel-doctor \
+aws cloudformation describe-stack --stack-name medical-mobile-iot-with-aws-doctor \
  --region us-east-1 \
  --query 'Stacks[0].Outputs[?OutputKey==`CallDoctorLambdaArn`].OutputValue' \
  --output text
@@ -220,7 +220,7 @@ Now we can deploy the stack (Update region if necessary)
 
 ```bash
 aws cloudformation create-stack --template-body file://stack.yaml \
-	--capabilities CAPABILITY_IAM --stack-name guardianangel-stack \
+	--capabilities CAPABILITY_IAM --stack-name medical-mobile-iot-with-aws-stack \
 	--region us-east-1 --parameters file://stack.json
 ```
 
@@ -241,13 +241,13 @@ Go to quicksight in your console.
 
 ### Running the mobile App
 
-Source for the mobile application can be found in the GuardianAngel folder
+Source for the mobile application can be found in the react-app folder
 
 There are several options for running the mobile application.
 
 1. If you have expo installed you can run it with the [expo cli](https://docs.expo.io/versions/latest/workflow/up-and-running/)
 2. You can build from source yourself with [expo](https://docs.expo.io/versions/latest/distribution/building-standalone-apps/)
-3. You can utilize the prebuilt apk under [releases](https://github.com/jasonrichardsmith/guardian-angel/releases) and [load the application with adb]().
+3. You can utilize the prebuilt apk under [releases](https://github.com/awslabs/medical-mobile-iot-with-aws/releases) and [load the application with adb]().
 
 ### Configuring the mobile app
 

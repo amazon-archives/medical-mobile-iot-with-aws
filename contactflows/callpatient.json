@@ -119,7 +119,7 @@
         },
         {
           "name": "BotName",
-          "value": "GuardianAngel"
+          "value": "MedicalMobileIoTWithAWS"
         },
         {
           "name": "BotAlias",
@@ -179,7 +179,7 @@
       "y": 20
     },
     "snapToGrid": false,
-    "name": "GuardianAngelCallPatient",
+    "name": "MedicalMobileIoTWithAWSCallPatient",
     "description": null,
     "type": "contactFlow",
     "status": "published",
