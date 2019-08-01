@@ -173,6 +173,7 @@ Go to the connect [console page](https://console.aws.amazon.com/connect) and cli
 ![connect11.1](./images/connect11.1.png)
 
 On the left menu click on Contact Flows.
+
 ![connect11.2](./images/connect11.2.png)
 
 And make the Lambda available to your contact flow.
