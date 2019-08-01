@@ -144,7 +144,7 @@ aws cloudformation create-stack --template-body file://calldoctor.yaml \
 When the stack is done deploying it provides an arn for the lambda it creates. We need to retrieve that arn
 
 ```bash
-aws cloudformation describe-stack --stack-name medical-mobile-iot-with-aws-doctor \
+aws cloudformation describe-stacks --stack-name medical-mobile-iot-with-aws-doctor \
  --region us-east-1 \
  --query 'Stacks[0].Outputs[?OutputKey==`CallDoctorLambdaArn`].OutputValue' \
  --output text
@@ -167,7 +167,25 @@ If you are running in a different region than us-east-1 edit the file to reflect
 
 ### Create the patient contact flow
 
-Open the file
+First we need to add the lambda we created earlier to the Amazon connect instance.
+Go to the connect [console page](https://console.aws.amazon.com/connect) and click on your Instance Alias.
+
+![connect11.1](./images/connect11.1.png)
+
+On the left menu click on Contact Flows.
+![connect11.2](./images/connect11.2.png)
+
+And make the Lambda available to your contact flow.
+
+![connect11.3](./images/connect11.3.png)
+
+And click + Add Lambda Function
+
+![connect11.4](./images/connect11.4.png)
+
+This will make Lambda available to your Connect Instance.
+
+Open the file:
 ```bash
 contactflows/callpatient.json
 ```
@@ -227,17 +245,11 @@ aws cloudformation create-stack --template-body file://stack.yaml \
 When the stack is finished deploying we will need to retrieve some final parameters to integrate our mobile application.
 
 ```bash
-aws cloudformation describe-stacks --stack-name ga-test2 --region us-east-1 --query 'Stacks[0].Outputs'
+aws cloudformation describe-stacks --stack-name medical-mobile-iot-with-aws-stack \
+--region us-east-1 --query 'Stacks[0].Outputs'
 ```
 
 ## Step 8
-
-### Building Quicksight
-[Sign up for Quicksight](https://docs.aws.amazon.com/quicksight/latest/user/setup-new-quicksight-account.html)
-
-Go to quicksight in your console.
-
-## Step 9
 
 ### Running the mobile App
 

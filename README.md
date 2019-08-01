@@ -75,6 +75,10 @@ For the full demo to work you are restricted to the following regions
 - US West (Oregon)
 
 
+
+## Building
+Jump to [BUILDING.md](./BUILDING.md) to start building the demo.
+
 ## License Summary
 
 The documentation is made available under the Creative Commons Attribution-ShareAlike 4.0 International License. See the LICENSE file.

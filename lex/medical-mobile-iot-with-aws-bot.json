@@ -2,10 +2,10 @@
     "intents": [
         {
             "intentVersion": "$LATEST",
-            "intentName": "medical-mobile-iot-with-aws"
+            "intentName": "medicalmobileiotwithawsintent"
         }
     ],
-    "name": "medical-mobile-iot-with-aws",
+    "name": "medicalmobileiotwithaws",
     "locale": "en-US",
     "clarificationPrompt": {
         "maxAttempts": 5,

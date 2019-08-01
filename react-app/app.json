@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Mediacal-IoT-Test-App",
-    "slug": "medical-mobile-iot-with-aws",
+    "slug": "medical_mobile_iot_with_aws",
     "privacy": "public",
     "sdkVersion": "33.0.0",
     "platforms": [
@@ -23,8 +23,8 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "ios": {
-      "supportsTablet": true
+    "android": {
+      "package": "com.amazon.medical_mobile_iot_with_aws"
     }
   }
 }
