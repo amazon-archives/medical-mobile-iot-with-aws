@@ -105,27 +105,27 @@ Resources:
         -- Compute an anomaly score for each record in the source stream using Random Cut Forest
         -- Creates a temporary stream and defines a schema
         CREATE OR REPLACE STREAM "MONITOR_STREAM" (
-           "PatientID"        varchar(16),
+           "PatientID"        varchar(64),
            "DeviceID"        INTEGER,
            "Type"        varchar(16),
            "COL_Value"        DOUBLE,
            "ANOMALY_SCORE"  DOUBLE);
         CREATE OR REPLACE STREAM "TEMP_STREAM" (
-           "PatientID"        varchar(16),
+           "PatientID"        varchar(64),
            "DeviceID"        INTEGER,
            "Type"        varchar(16),
            "COL_Value"        DOUBLE,
            "ANOMALY_SCORE"  DOUBLE);
         -- Creates an output stream and defines a schema
         CREATE OR REPLACE STREAM "DESTINATION_SQL_STREAM" (
-           "PatientID"        varchar(16),
+           "PatientID"        varchar(64),
            "DeviceID"        INTEGER,
            "Type"        varchar(16),
            "COL_Value"        DOUBLE,
            "ANOMALY_SCORE"  DOUBLE);
         -- Creates an trigger count stream and defines a schema   
         CREATE OR REPLACE STREAM "TRIGGER_COUNT_STREAM" (
-           "PatientID"        varchar(16),
+           "PatientID"        varchar(64),
            "DeviceID"        INTEGER,
            "Type"        varchar(16),
            "COL_Value"        DOUBLE,
@@ -167,7 +167,7 @@ Resources:
         InputSchema:
           RecordColumns:
            - Name: "PatientID"
-             SqlType: "VARCHAR(16)"
+             SqlType: "VARCHAR(64)"
              Mapping: "$.PatientId"
            - Name: "DeviceID"
              SqlType: "INTEGER"
@@ -278,7 +278,7 @@ Resources:
               patRecJson = response['Body'].read().decode('utf-8')
               json_content = json.loads(patRecJson)
               doctorN = json_content['drphone']
-              patientN = json_content['name']
+              patientN = json_content['phone']
               Doctor = json_content['drname']
               Name = json_content['name']
               # check if timeout
