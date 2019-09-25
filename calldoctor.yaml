@@ -96,6 +96,7 @@ Resources:
                 Effect: "Allow"
                 Action:
                   - "logs:*"
+                  - "connect:*"
                 Resource: "*"
   CallDoctorLambdaTriggerLogs:
     Type: AWS::Logs::LogGroup
